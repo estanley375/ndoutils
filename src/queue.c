@@ -173,6 +173,9 @@ char* pop_from_queue(void) {
 	ssize_t received;
 	size_t buf_size;
 
+	/* Explicitly set the message type. Previously it was inferred to be 0, but
+		never set. */
+	msg.type = 0L;
 	received = msgrcv(queue_id, &msg, NDO_MAX_MSG_SIZE, NDO_MSG_TYPE, MSG_NOERROR);
 	if (received < 0) {
 		syslog(LOG_ERR, "Error: queue recv error.");
@@ -181,6 +184,11 @@ char* pop_from_queue(void) {
 
 	buf_size = strnlen(msg.text, (size_t)received);
 	buf = malloc(buf_size+1);
+	/* Don't use the memory if the allocation failed */
+	if (!buf) {
+		syslog(LOG_ERR, "(%s: %lu) Error: Failed to allocate %lu bytes of memory for message. Data lost", __FILE__, __LINE__, buf_size + 1);
+		return NULL;
+	}
 	strncpy(buf, msg.text, buf_size);
 	buf[buf_size] = '\0';
 

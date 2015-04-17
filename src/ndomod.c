@@ -850,13 +850,13 @@ static int ndomod_write_to_sink(const char *buf, int buffer_write, int flush_buf
 				ndomod_hello_sink(reconnect, reconnect);
 
 				if (reconnect) {
-					ndomod_printf_to_logs("ndomod: Successfully reconnected to data sink! %lu items lost, %lu queued items to flush.", sinkbuf.overflow, sinkbuf.items);
+					ndomod_printf_to_logs("ndomod (%s: %lu): Successfully reconnected to data sink! %lu items lost, %lu queued items to flush.", __FILE__, __LINE__, sinkbuf.overflow, sinkbuf.items);
 				}
 				else if (sinkbuf.overflow) {
-					ndomod_printf_to_logs("ndomod: Successfully connected to data sink. %lu items lost, %lu queued items to flush.", sinkbuf.overflow, sinkbuf.items);
+					ndomod_printf_to_logs("ndomod (%s: %lu): Successfully connected to data sink. %lu items lost, %lu queued items to flush.", __FILE__, __LINE__, sinkbuf.overflow, sinkbuf.items);
 				}
 				else {
-					ndomod_printf_to_logs("ndomod: Successfully connected to data sink. %lu queued items to flush.", sinkbuf.items);
+					ndomod_printf_to_logs("ndomod (%s: %lu): Successfully connected to data sink. %lu queued items to flush.", __FILE__, __LINE__, sinkbuf.items);
 				}
 
 				/* Reset the sink overflow count. */
@@ -867,13 +867,13 @@ static int ndomod_write_to_sink(const char *buf, int buffer_write, int flush_buf
 				delta = (unsigned long)current_time - (unsigned long)ndomod_sink_last_reconnect_warning;
 				if (delta > ndomod_sink_reconnect_warning_interval) {
 					if (reconnect) {
-						ndomod_printf_to_logs("ndomod: Still unable to reconnect to data sink. %lu items lost, %lu queued items to flush.", sinkbuf.overflow, sinkbuf.items);
+						ndomod_printf_to_logs("ndomod (%s: %lu): Still unable to reconnect to data sink. %lu items lost, %lu queued items to flush.", __FILE__, __LINE__, sinkbuf.overflow, sinkbuf.items);
 					}
 					else if (ndomod_sink_connect_attempt == 1) {
-						ndomod_printf_to_logs("ndomod: Could not open data sink! I'll keep trying, but some output may get lost...");
+						ndomod_printf_to_logs("ndomod (%s: %lu): Could not open data sink! I'll keep trying, but some output may get lost...", __FILE__, __LINE__);
 					}
 					else {
-						ndomod_printf_to_logs("ndomod: Still unable to connect to data sink. %lu items lost, %lu queued items to flush.", sinkbuf.overflow, sinkbuf.items);
+						ndomod_printf_to_logs("ndomod (%s: %lu): Still unable to connect to data sink. %lu items lost, %lu queued items to flush.", __FILE__, __LINE__, sinkbuf.overflow, sinkbuf.items);
 					}
 
 					ndomod_sink_last_reconnect_warning = current_time;
@@ -907,7 +907,7 @@ static int ndomod_write_to_sink(const char *buf, int buffer_write, int flush_buf
 					ndomod_sink_last_reconnect_attempt = current_time;
 					ndomod_sink_last_reconnect_warning = current_time;
 
-					ndomod_printf_to_logs("ndomod: Error writing to data sink! Some output may get lost. %lu queued items to flush.", sinkbuf.items);
+					ndomod_printf_to_logs("ndomod (%s: %lu): Error writing to data sink! Some output may get lost. %lu queued items to flush.", __FILE__, __LINE__, sinkbuf.items);
 				}
 
 				/* Buffer the new output item for later if asked. */
@@ -919,7 +919,7 @@ static int ndomod_write_to_sink(const char *buf, int buffer_write, int flush_buf
 			ndomod_sink_buffer_pop(&sinkbuf);
 		}
 
-		ndomod_printf_to_logs("ndomod: Successfully flushed %lu queued items to data sink.", items_to_flush);
+		ndomod_printf_to_logs("ndomod (%s: %lu): Successfully flushed %lu queued items to data sink.", __FILE__, __LINE__, items_to_flush);
 	}
 
 
@@ -929,15 +929,15 @@ static int ndomod_write_to_sink(const char *buf, int buffer_write, int flush_buf
 	/* An error occurred... */
 	if (result < 0) {
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			ndomod_printf_to_logs("ndomod (%s: %lu): Error writing to data sink! (%lu: %s) Some output may get lost...", __FILE__, __LINE__, errno, strerror(errno));
+			ndomod_printf_to_logs("ndomod (%s: %lu): Please check remote ndo2db log, database connection or SSL parameters.", __FILE__, __LINE__);
+
 			/* Sink problem! Close the sink and log an error message. */
 			ndomod_close_sink();
 
 			time(&current_time);
 			ndomod_sink_last_reconnect_attempt = current_time;
 			ndomod_sink_last_reconnect_warning = current_time;
-
-			ndomod_printf_to_logs("ndomod: Error writing to data sink! Some output may get lost...");
-			ndomod_printf_to_logs("ndomod: Please check remote ndo2db log, database connection or SSL parameters.");
 		}
 
 		/* Buffer the new output item for later if asked. */

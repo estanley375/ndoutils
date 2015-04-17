@@ -1142,9 +1142,23 @@ void ndo2db_async_client_handle() {
 		char *temp_buf;
 		int i;
 		int start = 0;
+		size_t alloc_size;
 
+		/* Don't process something we don't have */
+		if (!qbuf) continue;
+
+		/* Add the data just received to the buffer */
 		if (old_buf != NULL) {
-			buf = calloc(strlen(qbuf)+strlen(old_buf)+2, sizeof(char));
+			alloc_size = strlen(qbuf) + strlen(old_buf) + 2;
+			buf = calloc(alloc_size, sizeof(char));
+
+			/* Memory allocation failed - discard data received from queue */
+			if (!buf) {
+				syslog(LOG_ERR,
+						"(%s: %lu) Error: Failed to allocate %lu bytes of memory message data. Data discarded",
+						__FILE__, __LINE__, alloc_size);
+				continue;
+			}
 
 			strcat(buf, old_buf);
 			strcat(buf, qbuf);
@@ -1156,14 +1170,26 @@ void ndo2db_async_client_handle() {
 			buf = qbuf;
 		}
 
+		/* Find all complete messages and pass them to the handler */
 		for (i = 0; i <= (int)strlen(buf); i++) {
 			if (buf[i] == '\n') {
 				int size = i-start;
 				temp_buf = calloc(size+1, sizeof(char));
+				if (!temp_buf) {
+					syslog(LOG_ERR, "(%s: %lu) Error: Failed to allocate %lu bytes of memory for complete message. Message discarded",
+							__FILE__, __LINE__, size + 1);
+					start = i+1;
+					continue;
+				}
 				strncpy(temp_buf, &buf[start], size);
 				temp_buf[size] = '\x0';
 
+				syslog(LOG_DEBUG, "(%s: %lu) Start handling client input #%lu",
+						__FILE__, __LINE__, idi.lines_processed);
+				syslog(LOG_DEBUG, "Data: %s\n", temp_buf);
 				ndo2db_handle_client_input(&idi, temp_buf);
+				syslog(LOG_DEBUG, "(%s: %lu) Done handling client input #%lu",
+						__FILE__, __LINE__, idi.lines_processed);
 
 				free(temp_buf);
 
@@ -1174,9 +1200,18 @@ void ndo2db_async_client_handle() {
 			}
 		}
 
+		/* Copy any unprocessed data to a buffer to be processed later when the
+			complete message is received */
 		if (start <= (int)strlen(buf)) {
-			old_buf = calloc(strlen(&buf[start])+1, sizeof(char));
-			strcpy(old_buf, &buf[start]);
+			alloc_size = strlen(&buf[start]) + 1;
+			old_buf = calloc(alloc_size, sizeof(char));
+			if (!old_buf) {
+				syslog(LOG_ERR, "(%s: %lu) Error: Failed to allocate %lu bytes of memory for remaining unprocessed data. Data discarded",
+						__FILE__, __LINE__, alloc_size);
+			}
+			else {
+				strcpy(old_buf, &buf[start]);
+			}
 		}
 
 		free(buf);
